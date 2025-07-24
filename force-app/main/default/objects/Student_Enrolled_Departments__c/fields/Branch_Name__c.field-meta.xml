@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Branch_Name__c</fullName>
+    <label>Branch Name</label>
+    <referenceTo>Branch__c</referenceTo>
+    <relationshipLabel>Student Enrolled Departments</relationshipLabel>
+    <relationshipName>Student_Enrolled_Departments</relationshipName>
+    <relationshipOrder>1</relationshipOrder>
+    <reparentableMasterDetail>false</reparentableMasterDetail>
+    <trackTrending>false</trackTrending>
+    <type>MasterDetail</type>
+    <writeRequiresMasterRead>false</writeRequiresMasterRead>
+</CustomField>
