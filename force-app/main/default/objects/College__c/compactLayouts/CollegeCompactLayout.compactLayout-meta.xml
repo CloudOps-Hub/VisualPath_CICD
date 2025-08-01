@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CompactLayout xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>CollegeCompactLayout</fullName>
+    <fields>Name</fields>
+    <fields>College_Start_Date__c</fields>
+    <fields>Courses_Offered__c</fields>
+    <label>CollegeCompactLayout</label>
+</CompactLayout>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RecordType xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Autonumous</fullName>
+    <active>true</active>
+    <label>Autonumous</label>
+    <picklistValues>
+        <picklist>Courses_Offered__c</picklist>
+        <values>
+            <fullName>CIVIL</fullName>
+            <default>true</default>
+        </values>
+        <values>
+            <fullName>CSE</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>ECE</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>EEE</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>IT</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>MECH</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+</RecordType>
