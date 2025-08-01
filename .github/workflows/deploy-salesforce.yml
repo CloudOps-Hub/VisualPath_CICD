@@ -1,0 +1,32 @@
+name: Salesforce Deployment
+
+on:
+    workflow_dispatch:
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+    steps:
+        - name: Checkout Repository
+          uses: actions/checkout@v3
+        
+        - name: Install Node
+          uses: actions/setup-node@v4
+          with:
+            node-version: 20
+
+        - name: Install SF CLI
+          run: npm install -g sfdx-cli
+        - name: Deploy to Salesforce
+
+        - name: Create server.key
+          run: |
+            mkdir -p assets
+            echo "{{ secrets.JWT_KEY }}" > assets/server.key
+          shell: bash
+
+        - name: Authenticate SF
+          run: |
+          sf org login jwt --client-id ${{ secrets.CLIENT_ID }} --jwtkeyfile assets/server.key --username ${{ secrets.USERNAME }} --instanceurl https://copadotrial175215700--uat.sandbox.my.salesforce.com
+          sf project deploy start -p force-app --testlevel NoTestRun
+
