@@ -6,7 +6,8 @@ on:
 jobs:
     deploy:
         runs-on: ubuntu-latest
-    steps:
+
+        steps:
         - name: Checkout Repository
           uses: actions/checkout@v3
         
@@ -17,7 +18,6 @@ jobs:
 
         - name: Install SF CLI
           run: npm install -g sfdx-cli
-        - name: Deploy to Salesforce
 
         - name: Create server.key
           run: |
@@ -26,10 +26,9 @@ jobs:
           shell: bash
 
         - name: Authenticate SF
-          run: |
-          sf org login jwt --client-id ${{ secrets.CLIENT_ID }} --jwtkeyfile assets/server.key --username ${{ secrets.USERNAME }} --instanceurl https://copadotrial175215700--uat.sandbox.my.salesforce.com --alias UATOrg
+          run: sf org login jwt --client-id ${{ secrets.CLIENT_ID }} --jwtkeyfile assets/server.key --username ${{ secrets.USERNAME }} --instanceurl https://copadotrial175215700--uat.sandbox.my.salesforce.com --alias UATOrg
 
         - name: Deploying Salesfoce 
-          sf project start -p force-app\ --target-org UATOrg --test-level NoTestRun --wait 120 --verbose
+          run: sf project start -p force-app\ --target-org UATOrg --test-level NoTestRun --wait 120 --verbose
           
 
