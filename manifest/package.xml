@@ -5,18 +5,15 @@
         <name>ApexClass</name>
     </types>
     <types>
-        <members>College__c</members>
         <members>University__c</members>
         <members>Branch__c</members>
         <members>Student__c</members>
+        <members>Account</members>
         <name>CustomObject</name>
     </types>
     <types>
-        <members>College__c</members>
-        <members>University__c</members>
-        <members>Branch__c</members>
-        <members>Student__c</members>
-        <name>CustomTab</name>
+        <members>*</members>
+        <name>Permissionset</name>
     </types>
     <version>64.0</version>
 </Package>
