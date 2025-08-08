@@ -26,7 +26,7 @@ jobs:
           shell: bash
 
         - name: Authenticate SF
-          run: sf org login jwt --client-id ${{ secrets.CLIENT_ID }} --jwtkeyfile assets/server.key --username ${{ secrets.USERNAME }} --instance-url https://login.salesforce.com --alias HUH
+          run: sf org login jwt --client-id ${{ secrets.CLIENT_ID }} --jwtkeyfile assets/server.key --username ${{ secrets.SF_USERNAME_UAT }} --instance-url https://login.salesforce.com --alias HUH
 
         - name: Deploying Salesfoce 
           run: sf project start -p force-app\ --target-org UATOrg --test-level NoTestRun --wait 120 --verbose
