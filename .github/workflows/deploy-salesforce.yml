@@ -24,9 +24,11 @@ jobs:
             mkdir -p assets
             echo "${{ secrets.JWT_KEY }}" | base64 --decode > assets/server.key
 
-        - name: Authenticate SF & Deploy
+        - name: Authenticate SF 
           run: |
               sf org login jwt --client-id ${{ secrets.CLIENT_ID }} --jwt-key-file assets/server.key --username ${{ secrets.SF_USERNAME_UAT }} --instance-url https://login.salesforce.com
-              sf project deploy start -p force-app\ --test-level NoTestRun --wait 120 --verbose
+        - name: SF Deploy
+          run: |
+              sf project deploy start -p force-app\ --test-level NoTestRun --target-org HUH --wait 120 --verbose
           
 
