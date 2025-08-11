@@ -31,6 +31,6 @@ jobs:
               sf org login jwt --client-id ${{ secrets.CLIENT_ID }} --jwt-key-file assets/server.key --username ${{ secrets.SF_USERNAME_UAT }} --instance-url https://login.salesforce.com --alias HUH
         - name: SF Deploy
           run: |
-              sf project deploy validate --source-dir force-app --test-level NoTestRun --target-org HUH --wait 120 --verbose
+              sf project deploy validate --source-dir force-app --test-level RunLocalTests --target-org HUH --wait 120 --verbose
           
 
