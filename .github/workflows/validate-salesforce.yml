@@ -44,6 +44,9 @@ jobs:
         - name: Generate Delta Package
           id: generate_delta # Add an ID to reference this step's outputs
           run: |
+            # Create the output directory if it doesn't exist
+            mkdir -p deploy_package
+            
             # Compare the PR branch (HEAD) against the main branch (origin/main)
             sf sgd source delta --to "HEAD" --from "origin/main" --output-dir deploy_package --generate-delta --verbose
             
