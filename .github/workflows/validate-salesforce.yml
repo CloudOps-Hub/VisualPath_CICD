@@ -1,4 +1,4 @@
-name: Salesforce Delta Validation
+name: Salesforce PR Validation
 
 on:
   pull_request:
@@ -8,49 +8,31 @@ on:
       - 'force-app/**'
 
 jobs:
-  validate-pr:
+  validate:
     runs-on: ubuntu-latest
 
     steps:
-      # --------------------
-      # 1. Checkout full repo history
-      # --------------------
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Needed for git history and sfdx-git-delta
 
-      # --------------------
-      # 2. Install Node
-      # --------------------
       - name: Install Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # --------------------
-      # 3. Install Salesforce CLI
-      # --------------------
       - name: Install Salesforce CLI
         run: npm install -g @salesforce/cli
 
-      # --------------------
-      # 4. Install sfdx-git-delta plugin
-      # --------------------
-      - name: Install SFDX-Git-Delta Plugin
+      - name: Install sfdx-git-delta Plugin
         run: echo "y" | sf plugins install sfdx-git-delta
 
-      # --------------------
-      # 5. Create server.key from secret
-      # --------------------
-      - name: Create server.key
+      - name: Create server.key from secret
         run: |
           mkdir -p assets
           echo "${{ secrets.JWT_KEY }}" | base64 --decode > assets/server.key
 
-      # --------------------
-      # 6. Authenticate Salesforce Org
-      # --------------------
       - name: Authenticate Salesforce Org
         run: |
           sf org login jwt \
@@ -60,40 +42,54 @@ jobs:
             --instance-url https://login.salesforce.com \
             --alias HUH
 
-      # --------------------
-      # 7. Generate Delta using merge-base
-      # --------------------
-      - name: Generate Delta Package
-        id: generate_delta
+      - name: Determine Base and Head Commits
+        id: commits
         run: |
-          mkdir -p deploy_package
-
           BASE_COMMIT=$(git merge-base origin/main HEAD)
           HEAD_COMMIT=HEAD
+          echo "Base commit: $BASE_COMMIT"
+          echo "Head commit: $HEAD_COMMIT"
+          echo "base_commit=$BASE_COMMIT" >> $GITHUB_OUTPUT
+          echo "head_commit=$HEAD_COMMIT" >> $GITHUB_OUTPUT
 
-          echo "Comparing commits:"
-          echo "Base: $BASE_COMMIT"
-          echo "Head: $HEAD_COMMIT"
+      - name: Show Changed Files
+        run: |
+          echo "Files changed between ${{ steps.commits.outputs.base_commit }} and ${{ steps.commits.outputs.head_commit }}:"
+          git diff --name-status ${{ steps.commits.outputs.base_commit }} ${{ steps.commits.outputs.head_commit }}
 
+      - name: Generate Delta Package
+        id: delta
+        run: |
+          mkdir -p deploy_package
+          echo "Running sfdx-git-delta..."
           sf sgd source delta \
-            --from $BASE_COMMIT \
-            --to $HEAD_COMMIT \
+            --from ${{ steps.commits.outputs.base_commit }} \
+            --to ${{ steps.commits.outputs.head_commit }} \
             --output-dir deploy_package \
-            --generate-delta
+            --generate-delta \
+            --verbose || true
+
+          # Check if delta is empty
+          if [ ! -s deploy_package/package.xml ]; then
+            echo "No changes detected with merge-base. Trying origin/main..."
+            sf sgd source delta \
+              --from origin/main \
+              --to HEAD \
+              --output-dir deploy_package \
+              --generate-delta \
+              --verbose || true
+          fi
 
           if [ ! -s deploy_package/package.xml ]; then
-            echo "No changes detected. Skipping deployment."
+            echo "No metadata changes found. Skipping deployment."
             echo "has_changes=false" >> $GITHUB_OUTPUT
           else
-            echo "Changes detected. Proceeding with deployment."
+            echo "Metadata changes found."
             echo "has_changes=true" >> $GITHUB_OUTPUT
           fi
 
-      # --------------------
-      # 8. Deploy Delta Components if there are changes
-      # --------------------
       - name: Deploy Delta Components
-        if: steps.generate_delta.outputs.has_changes == 'true'
+        if: steps.delta.outputs.has_changes == 'true'
         run: |
           sf project deploy start \
             --metadata-dir deploy_package \
