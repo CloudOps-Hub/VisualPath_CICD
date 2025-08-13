@@ -1,4 +1,4 @@
-name: Salesforce Deployment
+name: Salesforce Delta Validation
 
 on:
   pull_request:
@@ -13,31 +13,56 @@ jobs:
 
         steps:
         - name: Checkout Repository
-          uses: actions/checkout@v3
+          uses: actions/checkout@v4
           with:
-            fetch-depth: 0 //required for SGD to compare commits
+            fetch-depth: 0 # fetch-depth: 0 is crucial for SGD
         
         - name: Install Node
           uses: actions/setup-node@v4
           with:
             node-version: 20
 
-        - name: Install SF CLI
-          run: npm install --global @salesforce/cli
+        - name: Install Salesforce CLI
+          run: npm install -g @salesforce/cli
 
-        - name: Install SGD CLI
-          run: npm install sfdx-git-delta -g
+        - name: Install SFDX-Git-Delta Plugin
+          run: echo "y" | sf plugins install sfdx-git-delta # Use sf plugins install for the latest CLI and acknowledge unsigned plugin warning
 
         - name: Create server.key
           run: |
             mkdir -p assets
             echo "${{ secrets.JWT_KEY }}" | base64 --decode > assets/server.key
 
-        - name: Authenticate SF 
+        - name: Authenticate Salesforce Org
           run: |
               sf org login jwt --client-id ${{ secrets.CLIENT_ID }} --jwt-key-file assets/server.key --username ${{ secrets.SF_USERNAME_UAT }} --instance-url https://login.salesforce.com --alias HUH
-        - name: SF Deploy
+          env: # Add env block to access secrets in the step
+            JWT_KEY: ${{ secrets.JWT_KEY }}
+            CLIENT_ID: ${{ secrets.CLIENT_ID }}
+            SF_USERNAME_UAT: ${{ secrets.SF_USERNAME_UAT }}
+
+        - name: Generate Delta Package
+          id: generate_delta # Add an ID to reference this step's outputs
           run: |
-              sf project deploy start --source-dir force-app --test-level RunLocalTests --target-org HUH --wait 120 --verbose
-          
+            # Create the output directory if it doesn't exist
+            mkdir -p deploy_package
+
+            # Compare the PR branch (HEAD) against the main branch (origin/main)
+            sf sgd source delta --to "HEAD" --from "origin/main" --output-dir deploy_package --generate-delta
+            
+            # Check if the package.xml is empty
+            if [ ! -s deploy_package/package.xml ]; then
+              echo "No changes detected. Skipping deployment."
+              echo "::set-output name=has_changes::false"
+            else
+              echo "Changes detected. Proceeding with deployment."
+              echo "::set-output name=has_changes::true"
+            fi
+
+        - name: Deploy Delta Components
+          if: steps.generate_delta.outputs.has_changes == 'true' # Conditionally run this step
+          run: |
+            sf project deploy start --metadata-dir deploy_package --post-destructive-changes deploy_package/destructiveChanges.xml --test-level RunLocalTests --target-org HUH --wait 120 --verbose
+
+
 
