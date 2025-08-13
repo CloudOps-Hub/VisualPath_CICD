@@ -66,9 +66,7 @@ jobs:
             --from ${{ steps.commits.outputs.base_commit }} \
             --to ${{ steps.commits.outputs.head_commit }} \
             --output-dir deploy_package \
-            --generate-delta \
-            --verbose || true
-
+            --generate-delta || true
           # Check if delta is empty
           if [ ! -s deploy_package/package.xml ]; then
             echo "No changes detected with merge-base. Trying origin/main..."
@@ -76,8 +74,7 @@ jobs:
               --from origin/main \
               --to HEAD \
               --output-dir deploy_package \
-              --generate-delta \
-              --verbose || true
+              --generate-delta || true
           fi
 
           if [ ! -s deploy_package/package.xml ]; then
