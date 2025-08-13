@@ -48,7 +48,9 @@ jobs:
             mkdir -p deploy_package
 
             # Compare the PR branch (HEAD) against the main branch (origin/main)
-            sf sgd source delta --to "HEAD" --from "HEAD~1" --output-dir deploy_package --generate-delta
+            BASE_BRANCH="origin/${{ github.base_ref }}"
+            HEAD_BRANCH="origin/${{ github.head_ref }}"
+            sf sgd source delta --to $HEAD_BRANCH --from $BASE_BRANCH --output-dir deploy_package --generate-delta
             
             # Check if the package.xml is empty
             if [ ! -s deploy_package/package.xml ]; then
