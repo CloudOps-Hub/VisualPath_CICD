@@ -8,37 +8,49 @@ on:
       - 'force-app/**'
 
 jobs:
-  deploy:
+  validate-pr:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout full history (required for sgd)
+      # --------------------
+      # 1. Checkout full repo history
+      # --------------------
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # --------------------
       # 2. Install Node
+      # --------------------
       - name: Install Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
+      # --------------------
       # 3. Install Salesforce CLI
+      # --------------------
       - name: Install Salesforce CLI
         run: npm install -g @salesforce/cli
 
-      # 4. Install sfdx-git-delta
+      # --------------------
+      # 4. Install sfdx-git-delta plugin
+      # --------------------
       - name: Install SFDX-Git-Delta Plugin
         run: echo "y" | sf plugins install sfdx-git-delta
 
-      # 5. Create server.key from base64 secret
+      # --------------------
+      # 5. Create server.key from secret
+      # --------------------
       - name: Create server.key
         run: |
           mkdir -p assets
           echo "${{ secrets.JWT_KEY }}" | base64 --decode > assets/server.key
 
+      # --------------------
       # 6. Authenticate Salesforce Org
+      # --------------------
       - name: Authenticate Salesforce Org
         run: |
           sf org login jwt \
@@ -48,23 +60,24 @@ jobs:
             --instance-url https://login.salesforce.com \
             --alias HUH
 
-      # 7. Generate Delta Package using commit SHAs from PR
+      # --------------------
+      # 7. Generate Delta using merge-base
+      # --------------------
       - name: Generate Delta Package
         id: generate_delta
         run: |
           mkdir -p deploy_package
 
-          # Get base and head commit SHAs from the PR event payload
-          BASE_COMMIT=$(jq -r .pull_request.base.sha "$GITHUB_EVENT_PATH")
-          HEAD_COMMIT=$(jq -r .pull_request.head.sha "$GITHUB_EVENT_PATH")
+          BASE_COMMIT=$(git merge-base origin/main HEAD)
+          HEAD_COMMIT=HEAD
 
           echo "Comparing commits:"
           echo "Base: $BASE_COMMIT"
           echo "Head: $HEAD_COMMIT"
 
           sf sgd source delta \
-            --from "$BASE_COMMIT" \
-            --to "$HEAD_COMMIT" \
+            --from $BASE_COMMIT \
+            --to $HEAD_COMMIT \
             --output-dir deploy_package \
             --generate-delta
 
@@ -76,7 +89,9 @@ jobs:
             echo "has_changes=true" >> $GITHUB_OUTPUT
           fi
 
-      # 8. Deploy Delta Components only if changes detected
+      # --------------------
+      # 8. Deploy Delta Components if there are changes
+      # --------------------
       - name: Deploy Delta Components
         if: steps.generate_delta.outputs.has_changes == 'true'
         run: |
