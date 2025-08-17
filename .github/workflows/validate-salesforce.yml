@@ -1,4 +1,4 @@
-name: Salesforce Delta Validation
+name: Salesforce PR Validation
 
 on:
   pull_request:
@@ -8,49 +8,31 @@ on:
       - 'force-app/**'
 
 jobs:
-  validate-pr:
+  validate:
     runs-on: ubuntu-latest
 
     steps:
-      # --------------------
-      # 1. Checkout full repo history
-      # --------------------
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Needed for git history and sfdx-git-delta
 
-      # --------------------
-      # 2. Install Node
-      # --------------------
       - name: Install Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # --------------------
-      # 3. Install Salesforce CLI
-      # --------------------
       - name: Install Salesforce CLI
         run: npm install -g @salesforce/cli
 
-      # --------------------
-      # 4. Install sfdx-git-delta plugin
-      # --------------------
-      - name: Install SFDX-Git-Delta Plugin
+      - name: Install sfdx-git-delta Plugin
         run: echo "y" | sf plugins install sfdx-git-delta
 
-      # --------------------
-      # 5. Create server.key from secret
-      # --------------------
-      - name: Create server.key
+      - name: Create server.key from secret
         run: |
           mkdir -p assets
           echo "${{ secrets.JWT_KEY }}" | base64 --decode > assets/server.key
 
-      # --------------------
-      # 6. Authenticate Salesforce Org
-      # --------------------
       - name: Authenticate Salesforce Org
         run: |
           sf org login jwt \
@@ -60,45 +42,22 @@ jobs:
             --instance-url https://login.salesforce.com \
             --alias HUH
 
-      # --------------------
-      # 7. Generate Delta using merge-base
-      # --------------------
-      - name: Generate Delta Package
-        id: generate_delta
+      - name: Generate the package.xml for delta files
+        id: generate-delta-files
+        if: ${{ github.event_name == 'pull_request' }}
         run: |
-          mkdir -p deploy_package
+          mkdir delta
+          sf sgd source delta --to "HEAD" --from "HEAD~1" --output "./delta" --ignore-whitespace -d -i .sgdignore
+          echo "--- package.xml generated with added and modified metadata ---"
+          cat delta/package/package.xml
+          ls delta
 
-          BASE_COMMIT=$(git merge-base origin/main HEAD)
-          HEAD_COMMIT=HEAD
-
-          echo "Comparing commits:"
-          echo "Base: $BASE_COMMIT"
-          echo "Head: $HEAD_COMMIT"
-
-          sf sgd source delta \
-            --from $BASE_COMMIT \
-            --to $HEAD_COMMIT \
-            --output-dir deploy_package \
-            --generate-delta
-
-          if [ ! -s deploy_package/package.xml ]; then
-            echo "No changes detected. Skipping deployment."
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          else
-            echo "Changes detected. Proceeding with deployment."
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          fi
-
-      # --------------------
-      # 8. Deploy Delta Components if there are changes
-      # --------------------
-      - name: Deploy Delta Components
-        if: steps.generate_delta.outputs.has_changes == 'true'
+      - name: Validate components to Salesforce
+        id: validate-pull-request-components
+        if: ${{ github.event_name == 'pull_request' }}
         run: |
-          sf project deploy start \
-            --metadata-dir deploy_package \
-            --post-destructive-changes deploy_package/destructiveChanges.xml \
-            --test-level RunLocalTests \
-            --target-org HUH \
-            --wait 120 \
-            --verbose
+          sf project deploy validate --manifest delta/package/package.xml --test-level RunLocalTests --target-org HUH --coverage-formatters clover
+
+      #- name: Deploy Delta Components
+       # run: |
+       #   sf project deploy start --metadata-dir deploy_package --post-destructive-changes deploy_package/destructiveChanges.xml --test-level RunLocalTests --target-org HUH --wait 120 --verbose
