@@ -6,6 +6,13 @@ on:
       - main
     paths:
       - 'force-app/**'
+    inputs:
+      TESTLEVEL:
+        required: false
+        type: string
+      TESTCLASSES:
+        required: false
+        type: string
 
 # declare the local variables that are accessible within the complete pipeline
 env:
