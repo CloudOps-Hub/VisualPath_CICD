@@ -1,4 +1,4 @@
-name: Salesforce Delta Validation
+name: Salesforce PR Validation
 
 on:
   pull_request:
@@ -8,14 +8,14 @@ on:
       - 'force-app/**'
 
 jobs:
-  validate-pr:
+  validate:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Needed for git history and sfdx-git-delta
 
       - name: Install Node
         uses: actions/setup-node@v4
@@ -25,10 +25,10 @@ jobs:
       - name: Install Salesforce CLI
         run: npm install -g @salesforce/cli
 
-      - name: Install SFDX-Git-Delta Plugin
+      - name: Install sfdx-git-delta Plugin
         run: echo "y" | sf plugins install sfdx-git-delta
 
-      - name: Create server.key
+      - name: Create server.key from secret
         run: |
           mkdir -p assets
           echo "${{ secrets.JWT_KEY }}" | base64 --decode > assets/server.key
