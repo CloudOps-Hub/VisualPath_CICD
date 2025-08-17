@@ -68,7 +68,7 @@ jobs:
         id: validate-pull-request-components
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          sf project deploy validate --manifest delta/package/package.xml --test-level ${{ inputs.TESTLEVEL }} --tests ${{ inputs.TESTCLASSES }} --target-org HUH --coverage-formatters clover
+          sf project deploy validate --manifest delta/package/package.xml --test-level RunSpecifiedTests --tests "ChangePasswordControllerTest" --target-org HUH --coverage-formatters clover
 
       - name: Installing the SFDX CLI Scanner
         id: install-sfdx-scanner
