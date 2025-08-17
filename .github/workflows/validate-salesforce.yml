@@ -96,7 +96,7 @@ jobs:
         with:
           sarif_file: pmd-report.sarif
       
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         id: upload-scanner-report
         with:
           name: cli-scan-report
