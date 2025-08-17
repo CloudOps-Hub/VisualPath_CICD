@@ -58,6 +58,50 @@ jobs:
         run: |
           sf project deploy validate --manifest delta/package/package.xml --test-level RunLocalTests --target-org HUH --coverage-formatters clover
 
+      - name: Installing the SFDX CLI Scanner
+        id: install-sfdx-scanner
+        run: |
+          echo 'y' | sf plugins install @salesforce/sfdx-scanner
+
+      # run the security scan in all the files and store the result at reports/scan-reports.html location
+      - name: Run SFDX CLI Scanner
+        id: run-sfdx-scanner
+        run: |
+          mkdir reports
+          sf scanner run -f html -t "force-app" -e "eslint,retire-js,pmd,cpd" -c "Design,Best Practices,Code Style,Performance,Security" --outfile reports/scan-reports.html
+      
+      # Run Apex PMD Scan
+      - name: 'Run PMD scan'
+        uses: pmd/pmd-github-action@v1
+        id: pmd
+        with:
+            sourcePath: 'force-app'
+            rulesets: 'ruleset.xml'
+            analyzeModifiedFilesOnly: false
+
+      # Check for PMD violations
+      - name: 'Check for PMD violations'
+        # if: ${{steps.pmd.outputs.violations != 0 }}
+        run: |
+          # exit 1
+          echo "PMD Violatons ${{steps.pmd.outputs.violations}} "
+          echo "PMD outputs ${{toJSON(steps.pmd.outputs)}} "
+          echo "test"
+      
+      - name: Upload SARIF file
+        # if:  ${{steps.pmd.outputs.violations != 0 }}
+        
+        id: upload-sarif-file
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: pmd-report.sarif
+      
+      - uses: actions/upload-artifact@v3
+        id: upload-scanner-report
+        with:
+          name: cli-scan-report
+          path: reports/scan-reports.html
+
       #- name: Deploy Delta Components
        # run: |
        #   sf project deploy start --metadata-dir deploy_package --post-destructive-changes deploy_package/destructiveChanges.xml --test-level RunLocalTests --target-org HUH --wait 120 --verbose
