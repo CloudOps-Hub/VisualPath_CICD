@@ -5,6 +5,7 @@ public class EmpClass {
     String ename;
     //membermethods
     //1.create
+    //PMD
     public EmpClass(){
         eid=0;
         basic=0;

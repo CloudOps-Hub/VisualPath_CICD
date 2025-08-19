@@ -4,7 +4,7 @@ public class FirstClassTest {
         FirstClass obj = new FirstClass();//constructor method calling point
         obj.input(10, 20, 30);//calling point
         obj.process();
-        obj.output();//calling point
+        obj.output();//calling point//PMD
     }
     public static testmethod void gain(){
         FirstClass obj = new FirstClass();
