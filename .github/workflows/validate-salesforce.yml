@@ -9,7 +9,7 @@ on:
 
 env:
   TESTLEVEL: RunSpecifiedTests
-  TESTCLASSES: FirstClassTest, EmpClassTest
+  TESTCLASSES: FirstClassTest EmpClassTest
 
 jobs:
   validate:
