@@ -94,7 +94,7 @@ jobs:
         run: |
           echo "PMD Violations: ${{ steps.pmd.outputs.violations }}"
           if [ "${{ steps.pmd.outputs.violations }}" != "0" ]; then
-            echo "❌ PMD violations found!"
+            echo "PMD violations found!"
             exit 1
           fi
 
