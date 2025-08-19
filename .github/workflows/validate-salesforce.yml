@@ -9,7 +9,7 @@ on:
 
 env:
   TESTLEVEL: RunSpecifiedTests
-  TESTCLASSES: ChangePasswordControllerTest
+  TESTCLASSES: FirstClassTest, EmpClassTest
 
 jobs:
   validate:
