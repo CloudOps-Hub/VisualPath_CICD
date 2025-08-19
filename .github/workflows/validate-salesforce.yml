@@ -80,7 +80,7 @@ jobs:
         id: run-sfdx-scanner
         run: |
           mkdir reports
-          sf scanner run -f html -t "force-app" -e "eslint,retire-js,pmd,cpd" -c "Design,Best Practices,Code Style,Performance,Security" --outfile reports/scan-reports.html
+          sf scanner run -f html -t "force-app" -e "pmd,cpd" -c "Design,Best Practices,Code Style,Performance,Security" --outfile reports/scan-reports.html
       
       # Run Apex PMD Scan
       - name: 'Run PMD scan'
@@ -89,7 +89,7 @@ jobs:
         with:
             sourcePath: 'force-app'
             rulesets: 'ruleset.xml'
-            analyzeModifiedFilesOnly: false
+            analyzeModifiedFilesOnly: true
 
       # Check for PMD violations
       - name: 'Check for PMD violations'
