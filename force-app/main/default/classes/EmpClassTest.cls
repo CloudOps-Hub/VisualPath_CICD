@@ -1,3 +1,4 @@
+//TEST
 @isTest
 public class EmpClassTest {
     public static testmethod void main(){

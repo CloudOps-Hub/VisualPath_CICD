@@ -9,7 +9,7 @@ on:
 
 env:
   TESTLEVEL: RunSpecifiedTests
-  TESTCLASSES: ChangePasswordControllerTest
+  TESTCLASSES: FirstClassTest EmpClassTest
 
 jobs:
   validate:
@@ -109,3 +109,14 @@ jobs:
         with:
           name: cli-scan-report
           path: reports/scan-reports.html
+          
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        with:
+          args: >
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
+            -Dsonar.organization=${{ secrets.SONAR_ORG }}
+            -Dsonar.sources=force-app
+            -Dsonar.test.inclusions=**/*Test.cls
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

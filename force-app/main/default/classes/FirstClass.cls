@@ -4,6 +4,7 @@ public class FirstClass {
     Integer num1,num2, num3,result;//initially data members are null
     //member methods
     //1.create
+    //PMD
     public FirstClass(){
         num1= 0;
         num2= 0;
