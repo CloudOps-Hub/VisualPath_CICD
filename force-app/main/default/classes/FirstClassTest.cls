@@ -1,3 +1,4 @@
+//Test Manual Sonar
 @isTest
 public class FirstClassTest {
     public static testmethod void main(){
