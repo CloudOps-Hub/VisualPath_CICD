@@ -1,6 +1,7 @@
 //TEST
 //Updated Meta.xml version
-//MergeConflict Checking
+//MergeConflict Resolution
+//Testing Merge conflict
 @isTest
 public class EmpClassTest {
     public static testmethod void main(){

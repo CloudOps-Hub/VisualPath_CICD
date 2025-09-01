@@ -1,6 +1,7 @@
 //business class
 //develop
-//MergeConflict Checking
+//Testing Conflicts
+//MergeConflict Resolution
 public class EmpClass {
     //Updated Meta.xml version
     //data members
