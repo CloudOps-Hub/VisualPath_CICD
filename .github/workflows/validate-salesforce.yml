@@ -40,11 +40,11 @@ jobs:
       - name: Authenticate Salesforce Org
         run: |
           sf org login jwt \
-            --client-id ${{ secrets.CLIENT_ID_INT }} \
+            --client-id ${{ secrets.CLIENT_ID }} \
             --jwt-key-file assets/server.key \
-            --username ${{ secrets.SF_USERNAME_INT }} \
-            --instance-url https://dream-page-117.scratch.my.salesforce.com \
-            --alias INT-SFP
+            --username ${{ secrets.SF_USERNAME_UAT }} \
+            --instance-url https://login.salesforce.com \
+            --alias HUH
 
       - name: Generate the package.xml for delta files
         id: generate-delta-files
@@ -63,7 +63,7 @@ jobs:
             --manifest delta/package/package.xml \
             --test-level ${{ env.TESTLEVEL }} \
             --tests ${{ env.TESTCLASSES }} \
-            --target-org INT-SFP \
+            --target-org HUH \
             --coverage-formatters clover
 
       - name: Installing the SFDX CLI Scanner
