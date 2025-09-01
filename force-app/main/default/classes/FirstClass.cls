@@ -1,6 +1,7 @@
 //Test Manual Sona
 //public class
 //Develop tesing
+////MergeConflict Resolution
 public class FirstClass {
     //data members
     Integer num1,num2, num3,result;//initially data members are null
