@@ -1,7 +1,7 @@
 /**
  * An apex page controller that exposes the change password functionality
  */
-//checking Protection rules
+//checking Protection rules for Admin
 public with sharing class ChangePasswordController {
     public String oldPassword {get; set;}
     public String newPassword {get; set;}
