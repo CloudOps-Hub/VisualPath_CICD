@@ -1,7 +1,6 @@
 //Test Manual Sonar
 //Test Develop
 //MergeConflict Resolution
-//Checking new commits on open PR
 @isTest
 public class FirstClassTest {
     public static testmethod void main(){
