@@ -1,0 +1,21 @@
+name: Post-Deployment Workflow
+
+on:
+  workflow_dispatch:   # Manual or API trigger
+
+jobs:
+  post_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Salesforce
+        run: |
+          echo "${{ secrets.SF_AUTH_URL }}" > auth-url.txt
+          sf auth sfdxurl store -f auth-url.txt -a refreshed_sandbox
+
+      - name: Run Post Deployment Steps
+        run: |
+          sf data upsert bulk -s User -f data/users.csv -i Id
+          sf apex run -f scripts/postDeploy.apex
