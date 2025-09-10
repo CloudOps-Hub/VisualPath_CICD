@@ -52,7 +52,7 @@ jobs:
           id: generate-delta-files
           run: |
             mkdir delta
-            sf sgd source delta --to "HEAD" --from "origin/main" \
+            sf sgd source delta --to "HEAD" --from "origin/main~1" \
               --output "./delta" --ignore-whitespace -d -i .sgdignore
             echo "--- package.xml generated with added and modified metadata ---"
             cat delta/package/package.xml || echo "No package.xml generated"
