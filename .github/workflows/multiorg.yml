@@ -62,7 +62,7 @@ jobs:
           id: deploy-pull-request-components
           run: |
             sf project deploy start \
-                --source-dir -force-app \
+                --source-dir force-app \
                 --test-level NoTestRun \
                 --target-org HUH \
                 --coverage-formatters clover
