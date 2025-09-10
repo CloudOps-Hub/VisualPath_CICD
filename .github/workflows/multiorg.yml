@@ -48,21 +48,21 @@ jobs:
                 --instance-url https://login.salesforce.com \
                 --alias HUH
 
-        - name: Generate the package.xml for delta files
-          id: generate-delta-files
-          run: |
-            mkdir delta
-            sf sgd source delta --to "HEAD" --from "HEAD~1" \
-                --output "./delta" --ignore-whitespace -d -i .sgdignore
-            echo "--- package.xml generated with added and modified metadata ---"
-            cat delta/package/package.xml || echo "No package.xml generated"
-            ls delta
+        #- name: Generate the package.xml for delta files
+         # id: generate-delta-files
+          #run: |
+            #mkdir delta
+            #sf sgd source delta --to "HEAD" --from "HEAD~1" \
+             #  --output "./delta" --ignore-whitespace -d -i .sgdignore
+            #echo "--- package.xml generated with added and modified metadata ---"
+            #cat delta/package/package.xml || echo "No package.xml generated"
+            #ls delta
 
         - name: Deploy components to Salesforce
           id: deploy-pull-request-components
           run: |
             sf project deploy start \
-                --manifest delta/package/package.xml \
+                --force-app \
                 --test-level NoTestRun \
                 --target-org HUH \
                 --coverage-formatters clover
