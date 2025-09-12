@@ -1,0 +1,97 @@
+name: Create Release Branch (scheduled)
+
+on:
+  schedule:
+    - cron: '0 2 * * 1'   # every Monday 02:00 UTC - adjust as needed
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create_release_branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find PRs with milestone
+        id: findprs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pulls = await github.rest.pulls.list({
+              owner, repo, state: 'open', per_page: 100
+            });
+            const selected = pulls.data.filter(p => p.milestone && p.milestone.number);
+            core.setOutput('count', selected.length);
+            core.setOutput('pr_numbers', selected.map(p=>p.number).join(','));
+            core.setOutput('pr_heads', selected.map(p=>p.head.ref).join(','));
+            core.setOutput('pr_head_shas', selected.map(p=>p.head.sha).join(','));
+
+      - name: Create release branch
+        if: steps.findprs.outputs.count != '0'
+        id: create_branch
+        run: |
+          ts=$(date -u +'%Y%m%d-%H%M')
+          release_branch="release/${ts}"
+          echo "Creating release branch: $release_branch"
+          git fetch origin main
+          git checkout -b "${release_branch}" origin/main
+          git push origin "${release_branch}"
+          echo "release_branch=${release_branch}" >> $GITHUB_OUTPUT
+
+      - name: Merge PR branches into release (sequential)
+        if: steps.findprs.outputs.count != '0'
+        env:
+          RELEASE_BRANCH: ${{ steps.create_branch.outputs.release_branch }}
+        run: |
+          prs="${{ steps.findprs.outputs.pr_numbers }}"
+          echo "PRs to merge: $prs"
+          IFS=',' read -ra arr <<< "$prs"
+          for pr in "${arr[@]}"; do
+            echo "Merging PR #$pr into $RELEASE_BRANCH"
+            # Get PR head ref and repo
+            pr_info=$(gh pr view $pr --json headRefName,headRepository --jq '.headRefName + "||" + (.headRepository.fullName // "")')
+            IFS='||' read -r headRef headRepo <<< "$pr_info"
+            echo "PR headRef=$headRef headRepo=$headRepo"
+            # Merge using GitHub API: create a merge commit into release branch
+            git fetch origin
+            git checkout "$RELEASE_BRANCH"
+            # Pull PR head; if PR from fork, fetch remote first
+            if [ -n "$headRepo" ] && [[ "$headRepo" != "${{ github.repository }}" ]]; then
+              # add remote (temporary)
+              remote_name="r-$pr"
+              git remote add "$remote_name" "https://github.com/$headRepo.git" || true
+              git fetch "$remote_name" "$headRef" || true
+              git merge --no-ff -m "Merge PR #$pr into $RELEASE_BRANCH" "$remote_name/$headRef" || true
+              git remote remove "$remote_name" || true
+            else
+              git merge --no-ff -m "Merge PR #$pr into $RELEASE_BRANCH" "origin/$headRef" || true
+            fi
+            git push origin "$RELEASE_BRANCH" || true
+          done
+
+      - name: Create PR to SIT
+        if: steps.findprs.outputs.count != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const release_branch = process.env.RELEASE_BRANCH || '${{ steps.create_branch.outputs.release_branch }}';
+            const pr = await github.rest.pulls.create({
+              owner, repo,
+              head: release_branch,
+              base: 'sit',
+              title: `Release: ${release_branch} -> sit`,
+              body: `Automated release branch created with PRs: ${{ steps.findprs.outputs.pr_numbers }}`
+            });
+            core.setOutput('pr_url', pr.data.html_url);
+        env:
+          RELEASE_BRANCH: ${{ steps.create_branch.outputs.release_branch }}
