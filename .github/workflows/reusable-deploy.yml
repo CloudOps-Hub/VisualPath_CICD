@@ -21,8 +21,8 @@ on:
       JWT_KEY_BASE64:
         required: true
       # We expect org secrets for all environments to exist in the repo.
-      CLIENT_ID_QA: { required: false }
-      SF_USERNAME_QA: { required: false }
+      CLIENT_ID_INT: { required: false }
+      SF_USERNAME_INT: { required: false }
       CLIENT_ID_SIT: { required: false }
       SF_USERNAME_SIT: { required: false }
       CLIENT_ID_UAT: { required: false }
@@ -60,8 +60,8 @@ jobs:
           TARGET="${{ inputs.target }}"
           echo "Target: $TARGET"
           if [ "$TARGET" = "QA" ]; then
-            CLIENT_ID="${{ secrets.CLIENT_ID_QA }}"
-            SF_USERNAME="${{ secrets.SF_USERNAME_QA }}"
+            CLIENT_ID="${{ secrets.CLIENT_ID_INT }}"
+            SF_USERNAME="${{ secrets.SF_USERNAME_INT }}"
           elif [ "$TARGET" = "SIT" ]; then
             CLIENT_ID="${{ secrets.CLIENT_ID_SIT }}"
             SF_USERNAME="${{ secrets.SF_USERNAME_SIT }}"
