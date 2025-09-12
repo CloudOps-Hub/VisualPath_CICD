@@ -19,8 +19,8 @@ jobs:
       test_level: "RunSpecifiedTests"
     secrets:
       JWT_KEY_BASE64: ${{ secrets.JWT_KEY_BASE64 }}
-      CLIENT_ID_QA: ${{ secrets.CLIENT_ID_QA }}
-      SF_USERNAME_QA: ${{ secrets.SF_USERNAME_QA }}
+      CLIENT_ID_QA: ${{ secrets.CLIENT_ID_INT }}
+      SF_USERNAME_QA: ${{ secrets.SF_USERNAME_INT }}
       # include Sonar secrets if you use SonarCloud
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
