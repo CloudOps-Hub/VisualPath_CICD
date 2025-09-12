@@ -6,7 +6,6 @@ public class EmpClass {
     Integer eid,basic,hra,da,pf,tax,gross,netsal;
     String ename;
     //membermethods
-    //1.create
     public EmpClass(){
         eid=0;
         basic=0;
