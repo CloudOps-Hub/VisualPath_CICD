@@ -18,7 +18,7 @@ on:
         type: string
         default: "RunLocalTests"
     secrets:
-      JWT_KEY_BASE64:
+      JWT_KEY:
         required: true
       # We expect org secrets for all environments to exist in the repo.
       CLIENT_ID_INT: { required: false }
@@ -79,7 +79,7 @@ jobs:
           echo "CLIENT_ID=${CLIENT_ID}" >> $GITHUB_ENV
           echo "SF_USERNAME=${SF_USERNAME}" >> $GITHUB_ENV
           # JWT from secrets is provided as JWT_KEY_BASE64
-          echo "JWT_KEY_BASE64=${{ secrets.JWT_KEY_BASE64 }}" >> $GITHUB_ENV
+          echo "JWT_KEY=${{ secrets.JWT_KEY }}" >> $GITHUB_ENV
 
       - name: Authenticate to target org
         run: |
