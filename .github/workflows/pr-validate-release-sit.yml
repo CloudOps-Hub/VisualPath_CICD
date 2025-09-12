@@ -1,0 +1,26 @@
+name: PR Validate & Deploy → SIT
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - sit
+    paths:
+      - 'force-app/**'
+
+jobs:
+  call-deploy:
+    uses: ./.github/workflows/reusable-deploy.yml
+    with:
+      target: "SIT"
+      from_ref: ${{ github.event.pull_request.base.sha }}
+      to_ref: ${{ github.event.pull_request.head.sha }}
+      test_level: "RunLocalTests"
+    secrets:
+      JWT_KEY_BASE64: ${{ secrets.JWT_KEY_BASE64 }}
+      CLIENT_ID_SIT: ${{ secrets.CLIENT_ID_SIT }}
+      SF_USERNAME_SIT: ${{ secrets.SF_USERNAME_SIT }}
+      # sonar secrets optionally
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+      SONAR_ORG: ${{ secrets.SONAR_ORG }}
