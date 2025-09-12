@@ -1,0 +1,27 @@
+name: PR Validate → QA
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - qa
+    paths:
+      - 'force-app/**'
+
+jobs:
+  call-deploy:
+    uses: ./.github/workflows/reusable-deploy.yml
+    with:
+      target: "QA"
+      # for PRs, compare the PR head (github.event.pull_request.head.sha) vs the base before merge
+      from_ref: ${{ github.event.pull_request.base.sha }}
+      to_ref: ${{ github.event.pull_request.head.sha }}
+      test_level: "RunSpecifiedTests"
+    secrets:
+      JWT_KEY_BASE64: ${{ secrets.JWT_KEY_BASE64 }}
+      CLIENT_ID_QA: ${{ secrets.CLIENT_ID_QA }}
+      SF_USERNAME_QA: ${{ secrets.SF_USERNAME_QA }}
+      # include Sonar secrets if you use SonarCloud
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+      SONAR_ORG: ${{ secrets.SONAR_ORG }}
