@@ -1,11 +1,11 @@
 name: Salesforce Deployment
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'force-app/**'
+  workflow_dispatch:
+    #branches:
+     # - main
+    # paths:
+     # - 'force-app/**'
 
 jobs:
     deploy:
