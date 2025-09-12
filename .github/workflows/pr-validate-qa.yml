@@ -1,27 +1,124 @@
-name: PR Validate → QA
+name: Salesforce PR Validation - QA
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches:
-      - develop
+      - qa
     paths:
       - 'force-app/**'
 
+env:
+  TESTLEVEL: RunSpecifiedTests
+  TESTCLASSES: FirstClassTest EmpClassTest
+
 jobs:
-  call-deploy:
-    uses: ./.github/workflows/reusable-deploy.yml
-    with:
-      target: "QA"
-      # for PRs, compare the PR head (github.event.pull_request.head.sha) vs the base before merge
-      from_ref: ${{ github.event.pull_request.base.sha }}
-      to_ref: ${{ github.event.pull_request.head.sha }}
-      test_level: "RunSpecifiedTests"
-    secrets:
-      JWT_KEY_BASE64: ${{ secrets.JWT_KEY_BASE64 }}
-      CLIENT_ID_QA: ${{ secrets.CLIENT_ID_INT }}
-      SF_USERNAME_QA: ${{ secrets.SF_USERNAME_INT }}
-      # include Sonar secrets if you use SonarCloud
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
-      SONAR_ORG: ${{ secrets.SONAR_ORG }}
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Needed for git history and sfdx-git-delta
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Salesforce CLI
+        run: npm install -g @salesforce/cli
+
+      - name: Install sfdx-git-delta Plugin
+        run: echo "y" | sf plugins install sfdx-git-delta
+
+      - name: Create server.key from secret
+        run: |
+          mkdir -p assets
+          echo "${{ secrets.JWT_KEY }}" | base64 --decode > assets/server.key
+
+      - name: Authenticate Salesforce QA Org
+        run: |
+          sf org login jwt \
+            --client-id ${{ secrets.CLIENT_ID_INT }} \
+            --jwt-key-file assets/server.key \
+            --username ${{ secrets.SF_USERNAME_INT }} \
+            --instance-url https://test.salesforce.com \
+            --alias QAORG
+
+      - name: Generate the package.xml for delta files
+        id: generate-delta-files
+        run: |
+          mkdir delta
+          sf sgd source delta --to "HEAD" --from "HEAD~1" \
+            --output "./delta" --ignore-whitespace -d -i .sgdignore
+          echo "--- package.xml generated with added and modified metadata ---"
+          cat delta/package/package.xml || echo "No package.xml generated"
+          ls delta
+
+      - name: Validate components in QA Org
+        id: validate-pull-request-components
+        run: |
+          sf project deploy validate \
+            --manifest delta/package/package.xml \
+            --test-level ${{ env.TESTLEVEL }} \
+            --tests ${{ env.TESTCLASSES }} \
+            --target-org QAORG \
+            --coverage-formatters clover
+
+      - name: Installing the SFDX CLI Scanner
+        run: echo 'y' | sf plugins install @salesforce/sfdx-scanner
+
+      # Run SFDX Scanner (HTML report)
+      - name: Run SFDX CLI Scanner
+        run: |
+          mkdir reports
+          sf scanner run -f html \
+            -t "force-app" \
+            -e "eslint,pmd,cpd" \
+            -c "Design,Best Practices,Code Style,Performance,Security" \
+            --outfile reports/scan-reports.html
+
+      # Run Apex PMD Scan (SARIF report)
+      - name: Run PMD scan
+        uses: pmd/pmd-github-action@v2
+        id: pmd
+        with:
+          sourcePath: 'force-app'
+          rulesets: 'ruleset.xml'
+          analyzeModifiedFilesOnly: true
+          format: sarif
+          outputFile: pmd-report.sarif
+
+      - name: Check for PMD violations
+        run: |
+          echo "PMD Violations: ${{ steps.pmd.outputs.violations }}"
+          if [ "${{ steps.pmd.outputs.violations }}" != "0" ]; then
+            echo "PMD violations found!"
+            exit 1
+          fi
+
+      - name: Upload PMD SARIF file
+        if: ${{ steps.pmd.outputs.violations != '0' }}
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: pmd-report.sarif
+
+      - name: Upload CLI Scanner HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-scan-report
+          path: reports/scan-reports.html
+
+      - name: SonarCloud Scan
+        if: ${{ secrets.SONAR_TOKEN != '' && secrets.SONAR_PROJECT_KEY != '' && secrets.SONAR_ORG != '' }}
+        uses: SonarSource/sonarcloud-github-action@master
+        with:
+          args: >
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
+            -Dsonar.organization=${{ secrets.SONAR_ORG }}
+            -Dsonar.sources=force-app
+            -Dsonar.test.inclusions=**/*Test.cls
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
