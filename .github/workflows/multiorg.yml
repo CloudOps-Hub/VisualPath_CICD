@@ -1,0 +1,176 @@
+name: Salesforce MultiOrg
+on:
+  workflow_dispatch:
+    inputs:
+        target:
+            description: "select target environment"
+            required: true
+            default: "QA"
+            type: choice
+            options:
+                - QA
+                - SIT
+                - UAT
+                - PROD
+jobs:
+    deploy-qa:
+        if: ${{ github.event.inputs.target == 'QA' }}
+        runs-on: ubuntu-latest
+
+        steps:
+        - name: Checkout Repository
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 0 # Needed for git history and sfdx-git-delta
+
+        - name: Install Node
+          uses: actions/setup-node@v4
+          with:
+            node-version: 20
+
+        - name: Install Salesforce CLI
+          run: npm install -g @salesforce/cli
+
+        - name: Install sfdx-git-delta Plugin
+          run: echo "y" | sf plugins install sfdx-git-delta
+
+        - name: Create server.key from secret
+          run: |
+            mkdir -p assets
+            echo "${{ secrets.JWT_KEY }}" | base64 --decode > assets/server.key
+
+        - name: Authenticate Salesforce Org
+          run: |
+            sf org login jwt \
+                --client-id ${{ secrets.CLIENT_ID }} \
+                --jwt-key-file assets/server.key \
+                --username ${{ secrets.SF_USERNAME_UAT }} \
+                --instance-url https://login.salesforce.com \
+                --alias HUH
+
+        - name: Generate the package.xml for delta files
+          id: generate-delta-files
+          run: |
+            mkdir delta
+            sf sgd source delta --to "HEAD" --from "origin/main~1" \
+              --output "./delta" --ignore-whitespace -d -i .sgdignore
+            echo "--- package.xml generated with added and modified metadata ---"
+            cat delta/package/package.xml || echo "No package.xml generated"
+            ls delta
+
+        - name: Deploy components to Salesforce
+          id: deploy-pull-request-components
+          run: |
+            sf project deploy start \
+                --manifest delta/package/package.xml \
+                --test-level NoTestRun \
+                --target-org HUH \
+                --coverage-formatters clover
+    deploy-sit:
+        needs: deploy-qa
+        if: ${{ github.event.inputs.target == 'QA' }}
+        runs-on: ubuntu-latest
+
+        steps:
+        - name: Checkout Repository
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 0 # Needed for git history and sfdx-git-delta
+
+        - name: Install Node
+          uses: actions/setup-node@v4
+          with:
+            node-version: 20
+
+        - name: Install Salesforce CLI
+          run: npm install -g @salesforce/cli
+
+        - name: Install sfdx-git-delta Plugin
+          run: echo "y" | sf plugins install sfdx-git-delta
+
+        - name: Create server.key from secret
+          run: |
+            mkdir -p assets
+            echo "${{ secrets.JWT_KEY }}" | base64 --decode > assets/server.key
+
+        - name: Authenticate Salesforce Org
+          run: |
+            sf org login jwt \
+                --client-id ${{ secrets.CLIENT_ID }} \
+                --jwt-key-file assets/server.key \
+                --username ${{ secrets.SF_USERNAME_UAT }} \
+                --instance-url https://login.salesforce.com \
+                --alias HUH
+
+        - name: Generate the package.xml for delta files
+          id: generate-delta-files
+          run: |
+            mkdir delta
+            sf sgd source delta --to "HEAD" --from "HEAD~1" \
+                --output "./delta" --ignore-whitespace -d -i .sgdignore
+            echo "--- package.xml generated with added and modified metadata ---"
+            cat delta/package/package.xml || echo "No package.xml generated"
+            ls delta
+
+        - name: Deploy components to Salesforce
+          id: deploy-pull-request-components
+          run: |
+            sf project deploy start \
+                --manifest delta/package/package.xml \
+                --test-level NoTestRun \
+                --target-org HUH \
+                --coverage-formatters clover
+    deploy-uat:
+      needs: deploy-sit
+      if: ${{ github.event.inputs.target == 'QA' }}
+      runs-on: ubuntu-latest
+
+      steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Needed for git history and sfdx-git-delta
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Salesforce CLI
+        run: npm install -g @salesforce/cli
+
+      - name: Install sfdx-git-delta Plugin
+        run: echo "y" | sf plugins install sfdx-git-delta
+
+      - name: Create server.key from secret
+        run: |
+          mkdir -p assets
+          echo "${{ secrets.JWT_KEY }}" | base64 --decode > assets/server.key
+
+      - name: Authenticate Salesforce Org
+        run: |
+          sf org login jwt \
+              --client-id ${{ secrets.CLIENT_ID }} \
+              --jwt-key-file assets/server.key \
+              --username ${{ secrets.SF_USERNAME_UAT }} \
+              --instance-url https://login.salesforce.com \
+              --alias HUH
+
+      - name: Generate the package.xml for delta files
+        id: generate-delta-files
+        run: |
+          mkdir delta
+          sf sgd source delta --to "HEAD" --from "HEAD~1" \
+              --output "./delta" --ignore-whitespace -d -i .sgdignore
+          echo "--- package.xml generated with added and modified metadata ---"
+          cat delta/package/package.xml || echo "No package.xml generated"
+          ls delta
+
+      - name: Deploy components to Salesforce
+        id: deploy-pull-request-components
+        run: |
+          sf project deploy start \
+              --manifest delta/package/package.xml \
+              --test-level NoTestRun \
+              --target-org HUH \
+              --coverage-formatters clover

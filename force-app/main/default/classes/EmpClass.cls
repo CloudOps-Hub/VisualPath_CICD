@@ -1,6 +1,6 @@
 //business class
 //develop
-//Testing Conflicts
+//Multi Org Delta SIT UAT
 public class EmpClass {
     //Updated Meta.xml version
     //data members
@@ -8,7 +8,6 @@ public class EmpClass {
     String ename;
     //membermethods
     //1.create
-    //PMD
     public EmpClass(){
         eid=0;
         basic=0;
