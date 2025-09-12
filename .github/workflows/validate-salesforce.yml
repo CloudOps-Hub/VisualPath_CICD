@@ -1,11 +1,11 @@
 name: Salesforce PR Validation
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'force-app/**'
+  workflow_dispatch:
+    #branches:
+     # - main
+    # paths:
+     # - 'force-app/**'
 
 env:
   TESTLEVEL: RunSpecifiedTests
