@@ -18,7 +18,7 @@ jobs:
       to_ref: ${{ github.event.pull_request.head.sha }}
       test_level: "RunSpecifiedTests"
     secrets:
-      JWT_KEY_BASE64: ${{ secrets.JWT_KEY_BASE64 }}
+      JWT_KEY_BASE64: ${{ secrets.JWT_KEY }}
       CLIENT_ID_INT: ${{ secrets.CLIENT_ID_INT }}
       SF_USERNAME_INT: ${{ secrets.SF_USERNAME_INT }}
       # include Sonar secrets if you use SonarCloud
