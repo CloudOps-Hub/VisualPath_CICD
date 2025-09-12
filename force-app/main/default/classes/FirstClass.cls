@@ -1,7 +1,6 @@
 //Test Manual Sona
 //public class
 //Develop tesing
-////MergeConflict Resolution
 //Multi Org Delta SIT UAt
 //Test multi steage release branching strategy
 public class FirstClass {
