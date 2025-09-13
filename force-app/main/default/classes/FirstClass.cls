@@ -1,8 +1,8 @@
 //Test Manual Sona
 //public class
 //Develop tesing
-////MergeConflict Resolution
 //Multi Org Delta SIT UAt
+//Test multi steage release branching strategy
 public class FirstClass {
     //data members
     Integer num1,num2, num3,result;//initially data members are null
