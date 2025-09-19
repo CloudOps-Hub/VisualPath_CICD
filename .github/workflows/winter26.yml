@@ -75,7 +75,7 @@ jobs:
             RESULT=$(sf project deploy report -i $DEPLOY_ID --target-org HUH --json)
             STATUS=$(echo $RESULT | jq -r '.result.status')
             echo "⏳ Current status: $STATUS"
-            sleep 10
+            sleep 1
           done
 
           echo "✅ Final status: $STATUS"
