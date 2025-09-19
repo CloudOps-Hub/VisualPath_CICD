@@ -1,0 +1,85 @@
+name: Salesforce Deploy Result Winter26
+
+on:
+  pull_request:
+    branches: [ develop ]
+
+env:
+  TESTLEVEL: RunSpecifiedTests
+  TESTCLASSES: FirstClassTest EmpClassTest
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Salesforce CLI
+        run: npm install -g @salesforce/cli
+
+      - name: Install sfdx-git-delta Plugin
+        run: echo "y" | sf plugins install sfdx-git-delta
+
+      - name: Create server.key from secret
+        run: |
+          mkdir -p assets
+          echo "${{ secrets.JWT_KEY }}" | base64 --decode > assets/server.key
+
+      - name: Authenticate Salesforce Org
+        run: |
+          sf org login jwt \
+            --client-id ${{ secrets.CLIENT_ID }} \
+            --jwt-key-file assets/server.key \
+            --username ${{ secrets.SF_USERNAME_UAT }} \
+            --instance-url https://login.salesforce.com \
+            --alias HUH
+
+      - name: Generate the package.xml for delta files
+        id: generate-delta-files
+        run: |
+          mkdir delta
+          sf sgd source delta --to "HEAD" --from "HEAD~1" \
+            --output "./delta" --ignore-whitespace -d -i .sgdignore
+          echo "--- package.xml generated with added and modified metadata ---"
+          cat delta/package/package.xml || echo "No package.xml generated"
+          ls delta
+
+      - name: Deploy components to Salesforce (Async with Status Polling)
+        id: deploy-components
+        run: |
+          # Start deployment async
+          DEPLOY_ID=$(sf project deploy start \
+            --manifest delta/package/package.xml \
+            --test-level ${{ env.TESTLEVEL }} \
+            --tests ${{ env.TESTCLASSES }} \
+            --target-org HUH \
+            --coverage-formatters clover \
+            --async \
+            --json | jq -r '.result.id')
+
+          echo "🚀 Deployment started with ID: $DEPLOY_ID"
+
+          # Poll for status until it's final
+          STATUS="Pending"
+          while [[ "$STATUS" != "Succeeded" && "$STATUS" != "SucceededPartial" && "$STATUS" != "Failed" && "$STATUS" != "Canceled" && "$STATUS" != "FinalizingDeployFailed" ]]
+          do
+            RESULT=$(sf project deploy report -i $DEPLOY_ID --target-org HUH --json)
+            STATUS=$(echo $RESULT | jq -r '.result.status')
+            echo "⏳ Current status: $STATUS"
+            sleep 10
+          done
+
+          echo "✅ Final status: $STATUS"
+          if [[ "$STATUS" != "Succeeded" && "$STATUS" != "SucceededPartial" ]]; then
+            echo "❌ Deployment failed with status: $STATUS"
+            exit 1
+          fi
