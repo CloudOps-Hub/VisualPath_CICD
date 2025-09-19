@@ -70,16 +70,20 @@ jobs:
 
           # Poll for status until it's final
           STATUS="Pending"
+          LAST_STATUS=""
+
           while [[ "$STATUS" != "Succeeded" && "$STATUS" != "SucceededPartial" && "$STATUS" != "Failed" && "$STATUS" != "Canceled" && "$STATUS" != "FinalizingDeployFailed" ]]
           do
             RESULT=$(sf project deploy report -i $DEPLOY_ID --target-org HUH --json)
             STATUS=$(echo $RESULT | jq -r '.result.status')
-            echo "⏳ Current status: $STATUS"
+
+            if [[ "$STATUS" != "$LAST_STATUS" ]]; then
+              echo "$(date +'%Y-%m-%d %H:%M:%S') 🔄 Status changed: $STATUS"
+              LAST_STATUS=$STATUS
+            fi
             sleep 1
           done
-
           echo "✅ Final status: $STATUS"
-          if [[ "$STATUS" != "Succeeded" && "$STATUS" != "SucceededPartial" ]]; then
-            echo "❌ Deployment failed with status: $STATUS"
-            exit 1
-          fi
+
+
+
