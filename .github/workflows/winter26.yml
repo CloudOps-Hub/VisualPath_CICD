@@ -63,7 +63,7 @@ jobs:
             --tests ${{ env.TESTCLASSES }} \
             --target-org HUH \
             --coverage-formatters clover \
-            --async --wait 30 \
+            --async \
             --json | jq -r '.result.id')
 
           echo "🚀 Deployment started with ID: $DEPLOY_ID"
