@@ -69,7 +69,7 @@ jobs:
           echo "🚀 Deployment started with ID: $DEPLOY_ID"
 
           # Poll for status until it's final
-          STATUS="Pending"
+          STATUS=""
           LAST_STATUS=""
 
           while [[ "$STATUS" != "Succeeded" && "$STATUS" != "SucceededPartial" && "$STATUS" != "Failed" && "$STATUS" != "Canceled" && "$STATUS" != "FinalizingDeployFailed" ]]
