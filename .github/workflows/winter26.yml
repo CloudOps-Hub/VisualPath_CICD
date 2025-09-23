@@ -5,8 +5,8 @@ on:
     branches: [ develop ]
 
 env:
-  TESTLEVEL: RunLocalTests
-  #TESTCLASSES: FirstClassTest EmpClassTest
+  TESTLEVEL: RunSpecifiedTests
+  TESTCLASSES: FirstClassTest EmpClassTest
 
 jobs:
   deploy:
@@ -58,8 +58,9 @@ jobs:
         run: |
           # Start deployment async
           DEPLOY_ID=$(sf project deploy start \
-            --source-dir force-app \
+            --manifest delta/package/package.xml \
             --test-level ${{ env.TESTLEVEL }} \
+            --tests ${{ env.TESTCLASSES }} \
             --target-org HUH \
             --coverage-formatters clover \
             --async --wait 30 \
@@ -68,7 +69,7 @@ jobs:
           echo "🚀 Deployment started with ID: $DEPLOY_ID"
 
           # Poll for status until it's final
-          STATUS=""
+          STATUS="Pending"
           LAST_STATUS=""
 
           while [[ "$STATUS" != "Succeeded" && "$STATUS" != "SucceededPartial" && "$STATUS" != "Canceled" && "$STATUS" != "FinalizingDeployFailed" ]]
