@@ -5,8 +5,8 @@ on:
     branches: [ develop ]
 
 env:
-  TESTLEVEL: RunSpecifiedTests
-  TESTCLASSES: FirstClassTest EmpClassTest
+  TESTLEVEL: RunLocalTests
+  #TESTCLASSES: FirstClassTest EmpClassTest
 
 jobs:
   deploy:
@@ -58,12 +58,13 @@ jobs:
         run: |
           # Start deployment async
           DEPLOY_ID=$(sf project deploy start \
-            --manifest delta/package/package.xml \
+             --source-dir force-app \
+            #--manifest delta/package/package.xml \
             --test-level ${{ env.TESTLEVEL }} \
-            --tests ${{ env.TESTCLASSES }} \
+            #--tests ${{ env.TESTCLASSES }} \
             --target-org HUH \
             --coverage-formatters clover \
-            --async \
+            --async --wait 30 \
             --json | jq -r '.result.id')
 
           echo "🚀 Deployment started with ID: $DEPLOY_ID"
@@ -72,7 +73,7 @@ jobs:
           STATUS=""
           LAST_STATUS=""
 
-          while [[ "$STATUS" != "Succeeded" && "$STATUS" != "SucceededPartial" && "$STATUS" != "Failed" && "$STATUS" != "Canceled" && "$STATUS" != "FinalizingDeployFailed" ]]
+          while [[ "$STATUS" != "Succeeded" && "$STATUS" != "SucceededPartial" && "$STATUS" != "Canceled" && "$STATUS" != "FinalizingDeployFailed" ]]
           do
             RESULT=$(sf project deploy report -i $DEPLOY_ID --target-org HUH --json)
             STATUS=$(echo $RESULT | jq -r '.result.status')
