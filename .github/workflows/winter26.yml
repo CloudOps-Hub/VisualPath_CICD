@@ -70,20 +70,26 @@ jobs:
 
           # Poll for status until it's final
           STATUS="Pending"
+          STATE_DETAIL=""
           LAST_STATUS=""
+          LAST_DETAIL=""
 
-          while [[ "$STATUS" != "Succeeded" && "$STATUS" != "SucceededPartial" && "$STATUS" != "Canceled" && "$STATUS" != "FinalizingDeployFailed" ]]
+          while [[ "$STATUS" != "Succeeded" && "$STATUS" != "SucceededPartial" && "$STATUS" != "Canceled" && "$STATUS" != "Failed" ]]
           do
             RESULT=$(sf project deploy report -i $DEPLOY_ID --target-org HUH --json)
+
             STATUS=$(echo $RESULT | jq -r '.result.status')
+            STATE_DETAIL=$(echo $RESULT | jq -r '.result.stateDetail')
 
-            if [[ "$STATUS" != "$LAST_STATUS" ]]; then
-              echo "$(date +'%Y-%m-%d %H:%M:%S') 🔄 Status changed: $STATUS"
+            # Print only when something changes
+            if [[ "$STATUS" != "$LAST_STATUS" || "$STATE_DETAIL" != "$LAST_DETAIL" ]]; then
+              echo "$(date +'%Y-%m-%d %H:%M:%S') 🔄 Status: $STATUS | Detail: $STATE_DETAIL"
               LAST_STATUS=$STATUS
+              LAST_DETAIL=$STATE_DETAIL
             fi
-            sleep 1
+
+            sleep 3
           done
-          echo "✅ Final status: $STATUS"
 
-
+          echo "✅ Final status: $STATUS | Detail: $STATE_DETAIL"
 
