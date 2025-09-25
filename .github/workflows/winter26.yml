@@ -37,9 +37,9 @@ jobs:
       - name: Authenticate Salesforce Org
         run: |
           sf org login jwt \
-            --client-id ${{ secrets.CLIENT_ID }} \
+            --client-id 3MVG9aNlkJwuH9vMFLncdqB6aFLg0Z1.vT9p4Bxa8rNnPsPI44f62E0eTlu.aLLLwW3POWVzcrkbSB2HOYGcW \
             --jwt-key-file assets/server.key \
-            --username ${{ secrets.SF_USERNAME_UAT }} \
+            --username aranjithkumar0409-slfr@force.com \
             --instance-url https://login.salesforce.com \
             --alias HUH
 
