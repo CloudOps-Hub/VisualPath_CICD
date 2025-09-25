@@ -53,7 +53,7 @@ jobs:
           cat delta/package/package.xml || echo "No package.xml generated"
           ls delta
 
-      - name: Deploy components to Salesforce (Async with Status Polling)
+      - name: Deploy components to Salesforce (Async with Status Polling via Tooling API)
         id: deploy-components
         run: |
           # Start deployment async
@@ -62,34 +62,35 @@ jobs:
             --test-level ${{ env.TESTLEVEL }} \
             --tests ${{ env.TESTCLASSES }} \
             --target-org HUH \
-            --coverage-formatters clover \
             --async \
             --json | jq -r '.result.id')
-
+      
           echo "🚀 Deployment started with ID: $DEPLOY_ID"
-
-          # Poll for status until it's final
+      
+          # Get auth token and instance URL
+          ACCESS_TOKEN=$(sf org display --target-org HUH --json | jq -r '.result.accessToken')
+          INSTANCE_URL=$(sf org display --target-org HUH --json | jq -r '.result.instanceUrl')
+      
           STATUS="Pending"
-          STATE_DETAIL=""
           LAST_STATUS=""
-          LAST_DETAIL=""
-
-          while [[ "$STATUS" != "Succeeded" && "$STATUS" != "SucceededPartial" && "$STATUS" != "Canceled" && "$STATUS" != "Failed" ]]
-          do
-            RESULT=$(sf project deploy report -i $DEPLOY_ID --target-org HUH --json)
-
-            STATUS=$(echo $RESULT | jq -r '.result.status')
-            STATE_DETAIL=$(echo $RESULT | jq -r '.result.stateDetail')
-
-            # Print only when something changes
-            if [[ "$STATUS" != "$LAST_STATUS" || "$STATE_DETAIL" != "$LAST_DETAIL" ]]; then
+      
+          while true; do
+            RESPONSE=$(curl -s "$INSTANCE_URL/services/data/v62.0/tooling/query?q=SELECT+Id,Status,StateDetail+FROM+DeployRequest+WHERE+Id='$DEPLOY_ID'" \
+              -H "Authorization: Bearer $ACCESS_TOKEN")
+      
+            STATUS=$(echo $RESPONSE | jq -r '.records[0].Status')
+            STATE_DETAIL=$(echo $RESPONSE | jq -r '.records[0].StateDetail')
+      
+            if [[ "$STATUS" != "$LAST_STATUS" || "$STATE_DETAIL" != "null" ]]; then
               echo "$(date +'%Y-%m-%d %H:%M:%S') 🔄 Status: $STATUS | Detail: $STATE_DETAIL"
               LAST_STATUS=$STATUS
-              LAST_DETAIL=$STATE_DETAIL
             fi
-
-            sleep 3
+      
+            if [[ "$STATUS" == "Succeeded" || "$STATUS" == "SucceededPartial" || "$STATUS" == "Failed" || "$STATUS" == "Canceled" || "$STATUS" == "FinalizingDeployFailed" ]]; then
+              break
+            fi
+      
+            sleep 5
           done
-
+      
           echo "✅ Final status: $STATUS | Detail: $STATE_DETAIL"
-
