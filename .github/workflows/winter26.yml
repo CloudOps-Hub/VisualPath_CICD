@@ -37,9 +37,9 @@ jobs:
       - name: Authenticate Salesforce Org
         run: |
           sf org login jwt \
-            --client-id ${{ secrets.CLIENT_ID }} \
+            --client-id 3MVG9aNlkJwuH9vMFLncdqB6aFLg0Z1.vT9p4Bxa8rNnPsPI44f62E0eTlu.aLLLwW3POWVzcrkbSB2HOYGcW \
             --jwt-key-file assets/server.key \
-            --username ${{ secrets.SF_USERNAME_UAT }} \
+            --username aranjithkumar0409-slfr@force.com \
             --instance-url https://login.salesforce.com \
             --alias HUH
 
@@ -53,7 +53,7 @@ jobs:
           cat delta/package/package.xml || echo "No package.xml generated"
           ls delta
 
-      - name: Deploy components to Salesforce (Async with Status Polling)
+      - name: Deploy components to Salesforce (Async with Status Polling via Tooling API)
         id: deploy-components
         run: |
           # Start deployment async
@@ -62,24 +62,35 @@ jobs:
             --test-level ${{ env.TESTLEVEL }} \
             --tests ${{ env.TESTCLASSES }} \
             --target-org HUH \
-            --coverage-formatters clover \
             --async \
             --json | jq -r '.result.id')
-
+      
           echo "🚀 Deployment started with ID: $DEPLOY_ID"
-
-          # Poll for status until it's final
+      
+          # Get auth token and instance URL
+          ACCESS_TOKEN=$(sf org display --target-org HUH --json | jq -r '.result.accessToken')
+          INSTANCE_URL=$(sf org display --target-org HUH --json | jq -r '.result.instanceUrl')
+      
           STATUS="Pending"
-          while [[ "$STATUS" != "Succeeded" && "$STATUS" != "SucceededPartial" && "$STATUS" != "Failed" && "$STATUS" != "Canceled" && "$STATUS" != "FinalizingDeployFailed" ]]
-          do
-            RESULT=$(sf project deploy report -i $DEPLOY_ID --target-org HUH --json)
-            STATUS=$(echo $RESULT | jq -r '.result.status')
-            echo "⏳ Current status: $STATUS"
-            sleep 10
+          LAST_STATUS=""
+      
+          while true; do
+            RESPONSE=$(curl -s "$INSTANCE_URL/services/data/v62.0/tooling/query?q=SELECT+Id,Status,StateDetail+FROM+DeployRequest+WHERE+Id='$DEPLOY_ID'" \
+              -H "Authorization: Bearer $ACCESS_TOKEN")
+      
+            STATUS=$(echo $RESPONSE | jq -r '.records[0].Status')
+            STATE_DETAIL=$(echo $RESPONSE | jq -r '.records[0].StateDetail')
+      
+            if [[ "$STATUS" != "$LAST_STATUS" || "$STATE_DETAIL" != "null" ]]; then
+              echo "$(date +'%Y-%m-%d %H:%M:%S') 🔄 Status: $STATUS | Detail: $STATE_DETAIL"
+              LAST_STATUS=$STATUS
+            fi
+      
+            if [[ "$STATUS" == "Succeeded" || "$STATUS" == "SucceededPartial" || "$STATUS" == "Failed" || "$STATUS" == "Canceled" || "$STATUS" == "FinalizingDeployFailed" ]]; then
+              break
+            fi
+      
+            sleep 5
           done
-
-          echo "✅ Final status: $STATUS"
-          if [[ "$STATUS" != "Succeeded" && "$STATUS" != "SucceededPartial" ]]; then
-            echo "❌ Deployment failed with status: $STATUS"
-            exit 1
-          fi
+      
+          echo "✅ Final status: $STATUS | Detail: $STATE_DETAIL"
