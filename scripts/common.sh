@@ -14,7 +14,7 @@ install_tools() {
 auth_org() {
   local alias="$1"
   mkdir -p assets
-  echo "${JWT_KEY_BASE64}" | base64 --decode > assets/server.key
+  echo "${JWT_KEY}" | base64 --decode > assets/server.key
   sf org login jwt \
     --client-id "${CLIENT_ID}" \
     --jwt-key-file assets/server.key \
