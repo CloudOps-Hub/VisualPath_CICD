@@ -48,15 +48,9 @@ jobs:
           comment="${{ github.event.comment.body }}"
           echo "Comment: $comment"
 
-          # Check if comment contains test commands
-          if echo "$comment" | grep -qE "^/(run-tests|run-all-tests|run-affected-tests)"; then
-            echo "should_run_tests=true" >> $GITHUB_OUTPUT
-            echo "Test command found, proceeding with validation"
-          else
-            echo "should_run_tests=false" >> $GITHUB_OUTPUT
-            echo "No test command found, exiting workflow"
-            exit 0
-          fi
+          # For now, trigger on ANY comment (since it's on a PR)
+          echo "should_run_tests=true" >> $GITHUB_OUTPUT
+          echo "Comment found on PR, proceeding with validation"
 
           # Get PR details
           pr_number="${{ github.event.issue.number }}"
@@ -70,6 +64,7 @@ jobs:
 
           echo "base_ref=$base_ref" >> $GITHUB_OUTPUT
           echo "head_ref=$head_ref" >> $GITHUB_OUTPUT
+
 
   setup-environment:
     runs-on: ubuntu-latest
