@@ -21,11 +21,11 @@ on:
         default: NONE
   pull_request:
     types: [opened, synchronize, edited, reopened, ready_for_review]
-    branches: [test, uat]
+    branches: [main, test, uat]
     paths:
       - "force-app/**"
   issue_comment:
-    types: [created]
+    types: [created, edited]
 
 env:
   HTTP_PROXY: "xx"
