@@ -1,8 +1,8 @@
 name: Salesforce Deploy Result Winter26
 
 on:
-  pull_request:
-    branches: [ develop ]
+  workflow_dispatch:
+    #branches: [ develop ]
 
 env:
   TESTLEVEL: RunSpecifiedTests
