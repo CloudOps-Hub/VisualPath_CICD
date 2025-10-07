@@ -46,24 +46,33 @@ jobs:
     steps:
       - name: Filter Comment for Test Commands
         id: filter_comment
+        shell: bash
         run: |
+          set +e  # prevent job from failing if command exits non-zero
           comment="${{ github.event.comment.body }}"
           echo "Comment: $comment"
 
-          # Detect test trigger commands
+          # Check for test trigger commands
           if echo "$comment" | grep -qE "^/(run-tests|run-all-tests|run-affected-tests)"; then
             echo "should_run_tests=true" >> $GITHUB_OUTPUT
-            echo "Command found: triggering validation."
+            echo "✅ Test command detected: proceeding with validation"
           else
             echo "should_run_tests=false" >> $GITHUB_OUTPUT
-            echo "No test command found, skipping validation."
+            echo "ℹ️ No test command found. Exiting gracefully."
             exit 0
+          fi
+
+          # Extract test class names (if any)
+          if [[ "$comment" =~ ^/run-tests ]]; then
+            test_classes=$(echo "$comment" | sed -E 's#^/run-tests[[:space:]]*##')
+            echo "test_classes=$test_classes" >> $GITHUB_OUTPUT
+            echo "Detected test classes: $test_classes"
           fi
 
           pr_number="${{ github.event.issue.number }}"
           echo "pr_number=$pr_number" >> $GITHUB_OUTPUT
 
-          # Fetch PR details
+          echo "Fetching PR details from GitHub API..."
           pr_data=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/pulls/$pr_number")
 
@@ -72,6 +81,7 @@ jobs:
 
           echo "base_ref=$base_ref" >> $GITHUB_OUTPUT
           echo "head_ref=$head_ref" >> $GITHUB_OUTPUT
+          echo "✅ Base: $base_ref | Head: $head_ref"
 
   setup-environment:
     runs-on: ubuntu-latest
