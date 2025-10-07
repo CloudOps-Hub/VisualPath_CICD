@@ -38,7 +38,7 @@ jobs:
   #########################################################################
   # 1️⃣ Check Comments - Detect Test Commands
   #########################################################################
-    check-comment:
+  check-comment:
     runs-on: ubuntu-latest
     if: github.event_name == 'issue_comment' && github.event.issue.pull_request
     outputs:
