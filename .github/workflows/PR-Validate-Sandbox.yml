@@ -22,7 +22,7 @@ on:
 
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    branches: [test, qa, uat]
+    branches: [main, qa, uat]
     paths:
       - "force-app/**"
 
