@@ -1,5 +1,5 @@
 name: PR-Validate-Sandbox
-run-name: "PR-Validate-Sandbox"
+run-name: "PR Validation for Sandbox"
 
 on:
   workflow_dispatch:
@@ -11,19 +11,21 @@ on:
         description: "Please enter head branch name."
         required: true
       sandbox:
-        description: "In which Sandbox do you want to validate?"
+        description: "Select Sandbox to validate in"
         required: true
         type: choice
         options:
           - test
           - qa
           - uat
-        default: NONE
+        default: test
+
   pull_request:
-    types: [opened, synchronize, edited, reopened, ready_for_review]
-    branches: [main, test, uat]
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [test, qa, uat]
     paths:
       - "force-app/**"
+
   issue_comment:
     types: [created, edited]
 
@@ -33,6 +35,9 @@ env:
   NO_PROXY: ""
 
 jobs:
+  #########################################################################
+  # 1️⃣ Check Comments - Detect Test Commands
+  #########################################################################
   check-comment:
     runs-on: ubuntu-latest
     if: github.event_name == 'issue_comment' && github.event.issue.pull_request
@@ -41,6 +46,7 @@ jobs:
       pr_number: ${{ steps.filter_comment.outputs.pr_number }}
       base_ref: ${{ steps.filter_comment.outputs.base_ref }}
       head_ref: ${{ steps.filter_comment.outputs.head_ref }}
+
     steps:
       - name: Filter Comment for Test Commands
         id: filter_comment
@@ -48,31 +54,39 @@ jobs:
           comment="${{ github.event.comment.body }}"
           echo "Comment: $comment"
 
-          # Check if comment contains test commands
+          # Detect test trigger commands
           if echo "$comment" | grep -qE "^/(run-tests|run-all-tests|run-affected-tests)"; then
             echo "should_run_tests=true" >> $GITHUB_OUTPUT
+            echo "Command found: triggering validation."
           else
             echo "should_run_tests=false" >> $GITHUB_OUTPUT
+            echo "No test command found, skipping validation."
+            exit 0
           fi
 
-          # Get PR details
           pr_number="${{ github.event.issue.number }}"
           echo "pr_number=$pr_number" >> $GITHUB_OUTPUT
 
+          # Fetch PR details
           pr_data=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/pulls/$pr_number")
+
           base_ref=$(echo "$pr_data" | jq -r '.base.ref')
           head_ref=$(echo "$pr_data" | jq -r '.head.ref')
 
           echo "base_ref=$base_ref" >> $GITHUB_OUTPUT
           echo "head_ref=$head_ref" >> $GITHUB_OUTPUT
-          
+
+  #########################################################################
+  # 2️⃣ Setup Environment
+  #########################################################################
   setup-environment:
     runs-on: ubuntu-latest
-    needs: check-comment
+    needs: [check-comment]
     if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || needs.check-comment.outputs.should_run_tests == 'true')
     outputs:
       environment_name: ${{ steps.set_env.outputs.environment_name }}
+
     steps:
       - name: Set Environment
         id: set_env
@@ -85,6 +99,9 @@ jobs:
             echo "environment_name=${{ needs.check-comment.outputs.base_ref }}" >> $GITHUB_OUTPUT
           fi
 
+  #########################################################################
+  # 3️⃣ Validate Deployment and Run Tests
+  #########################################################################
   validation-on-sandbox:
     runs-on: ubuntu-latest
     needs: [setup-environment, check-comment]
@@ -106,22 +123,25 @@ jobs:
           git config --local user.name "Salesforce DevOps"
           git config --local user.email "salesforce-devops@users.noreply.github.com"
 
-      - name: Parse Test Command from PR or Comment
+      - name: Extract Test Classes (parser.js)
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body || '' }}
+          PR_BODY: ${{ github.event.pull_request.body || '' }}
         run: |
           if [ "${{ github.event_name }}" = "issue_comment" ]; then
-            echo "${{ github.event.comment.body }}" > ./comment_body.txt
+            echo "$COMMENT_BODY" > ./comment_body.txt
+            node ./parser.js
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "${{ github.event.pull_request.body }}" > ./pr_body.txt
+            echo "$PR_BODY" > ./pr_body.txt
+            node ./parser.js
           else
             echo "all" > ./testsToRun.txt
           fi
-
-          node ./parser.js
           TESTS=$(cat testsToRun.txt)
           echo "APEX_TESTS=$TESTS" >> $GITHUB_ENV
-          echo "📝 Final selected test classes: $TESTS"
+          echo "Selected tests: $TESTS"
 
-      - name: Install sfdx git delta plugin
+      - name: Install sfdx-git-delta Plugin
         run: |
           echo y | sf plugins install sfdx-git-delta
           sf plugins
@@ -129,9 +149,9 @@ jobs:
       - name: Authenticate to Sandbox Org
         run: |
           echo "${{ secrets.SFDX_AUTH_URL }}" > ./SFDX_AUTH_URL.txt
-          sf org login sfdx-url -f ./SFDX_AUTH_URL.txt -a validationOrg
+          sf org login sfdx-url -f ./SFDX_AUTH_URL.txt -a targetOrg
 
-      - name: Create delta package
+      - name: Create Delta Package
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             base_branch="${{ inputs.base }}"
@@ -149,48 +169,29 @@ jobs:
 
           mkdir changed-sources
           sf agd source delta --to "origin/$head_branch" --from "origin/$base_branch" -o changed-sources/ --generate-delta -f
-
           cd changed-sources
           ls -R
 
-      - name: Validate the delta package with specified tests
-        if: ${{ env.APEX_TESTS != 'all' }}
+      - name: Validate Deployment
         run: |
-          echo "🚀 Validation in progress with specified tests: $APEX_TESTS"
-          validation_output=$(sf project deploy validate --source-dir "changed-sources/force-app" --async --test-level RunSpecifiedTests --tests $APEX_TESTS --target-org validationOrg --json)
-          echo "Validation Output: $validation_output"
-          job_id=$(echo $validation_output | jq -r '.result.id')
-          echo "Extracted job_id: $job_id"
-          if [ -z "$job_id" ] || [ "$job_id" = "null" ]; then
-            echo "❌ Failed to extract job_id from validation output."
-            exit 1
+          echo "Starting validation..."
+          if [ "${{ env.APEX_TESTS }}" = "all" ]; then
+            validation_output=$(sf project deploy validate --source-dir "changed-sources/force-app" --async --test-level RunLocalTests --json)
           else
-            echo "job_id=$job_id" >> $GITHUB_ENV
-            echo $job_id > job_id.txt
-            sf project deploy resume --job-id $job_id
+            validation_output=$(sf project deploy validate --source-dir "changed-sources/force-app" --async --test-level RunSpecifiedTests --tests "${{ env.APEX_TESTS }}" --json)
           fi
 
-      - name: Validate the delta package with all tests
-        if: ${{ env.APEX_TESTS == 'all' }}
-        run: |
-          echo "🚀 Validation in progress with ALL tests"
-          validation_output=$(sf project deploy validate --source-dir "changed-sources/force-app" --async --test-level RunLocalTests --target-org validationOrg --json)
           echo "Validation Output: $validation_output"
           job_id=$(echo $validation_output | jq -r '.result.id')
-          echo "Extracted job_id: $job_id"
-          if [ -z "$job_id" ] || [ "$job_id" = "null" ]; then
-            echo "❌ Failed to extract job_id from validation output."
-            exit 1
-          else
-            echo "job_id=$job_id" >> $GITHUB_ENV
-            echo $job_id > job_id.txt
-            sf project deploy resume --job-id $job_id
-          fi
+          echo "job_id=$job_id" >> $GITHUB_ENV
+          echo $job_id > job_id.txt
 
-      - name: Upload job id as an artifact
+          sf project deploy resume --job-id $job_id
+
+      - name: Upload Job ID Artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: job-id-artifact-${{ github.event.pull_request.number }}
+          name: job-id-artifact-${{ github.run_id }}
           path: job_id.txt
           retention-days: 5
