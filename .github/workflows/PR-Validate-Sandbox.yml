@@ -1,5 +1,5 @@
 name: PR-Validate-Sandbox
-run-name: "PR Validation for Sandbox"
+run-name: "PR Validation - Sandbox"
 
 on:
   workflow_dispatch:
@@ -11,33 +11,30 @@ on:
         description: "Please enter head branch name."
         required: true
       sandbox:
-        description: "Select Sandbox to validate in"
+        description: "In which Sandbox do you want to validate?"
         required: true
         type: choice
         options:
           - test
           - qa
           - uat
-        default: test
-
+        default: NONE
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    branches: [main, qa, uat]
+    types: [opened, synchronize, edited, reopened, ready_for_review]
+    branches: [test, uat]
     paths:
       - "force-app/**"
-
   issue_comment:
-    types: [created, edited]
+    types: [created]
 
 env:
   HTTP_PROXY: "xx"
   HTTPS_PROXY: "xx"
   NO_PROXY: ""
+  TESTLEVEL: RunLocalTests
+  TESTCLASSES: all
 
 jobs:
-  #########################################################################
-  # 1️⃣ Check Comments - Detect Test Commands
-  #########################################################################
   check-comment:
     runs-on: ubuntu-latest
     if: github.event_name == 'issue_comment' && github.event.issue.pull_request
@@ -46,37 +43,27 @@ jobs:
       pr_number: ${{ steps.filter_comment.outputs.pr_number }}
       base_ref: ${{ steps.filter_comment.outputs.base_ref }}
       head_ref: ${{ steps.filter_comment.outputs.head_ref }}
-      test_classes: ${{ steps.filter_comment.outputs.test_classes }}
     steps:
       - name: Filter Comment for Test Commands
         id: filter_comment
-        shell: bash
         run: |
-          set +e  # prevent job from failing if command exits non-zero
           comment="${{ github.event.comment.body }}"
           echo "Comment: $comment"
 
-          # Check for test trigger commands
+          # Detect test trigger commands
           if echo "$comment" | grep -qE "^/(run-tests|run-all-tests|run-affected-tests)"; then
             echo "should_run_tests=true" >> $GITHUB_OUTPUT
-            echo "✅ Test command detected: proceeding with validation"
+            echo "Command found: triggering validation."
           else
             echo "should_run_tests=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ No test command found. Exiting gracefully."
+            echo "No test command found, skipping validation."
             exit 0
-          fi
-
-          # Extract test class names (if any)
-          if [[ "$comment" =~ ^/run-tests ]]; then
-            test_classes=$(echo "$comment" | sed -E 's#^/run-tests[[:space:]]*##')
-            echo "test_classes=$test_classes" >> $GITHUB_OUTPUT
-            echo "Detected test classes: $test_classes"
           fi
 
           pr_number="${{ github.event.issue.number }}"
           echo "pr_number=$pr_number" >> $GITHUB_OUTPUT
 
-          echo "Fetching PR details from GitHub API..."
+          # Fetch PR details
           pr_data=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/pulls/$pr_number")
 
@@ -85,19 +72,14 @@ jobs:
 
           echo "base_ref=$base_ref" >> $GITHUB_OUTPUT
           echo "head_ref=$head_ref" >> $GITHUB_OUTPUT
-          echo "✅ Base: $base_ref | Head: $head_ref"
 
-
-  #########################################################################
-  # 2️⃣ Setup Environment
-  #########################################################################
   setup-environment:
-      runs-on: ubuntu-latest
-      needs: check-comment
-      if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || needs.check-comment.outputs.should_run_tests == 'true')
-      outputs:
-        environment_name: ${{ steps.set_env.outputs.environment_name }}
-      steps:
+    runs-on: ubuntu-latest
+    needs: check-comment
+    if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || needs.check-comment.outputs.should_run_tests == 'true')
+    outputs:
+      environment_name: ${{ steps.set_env.outputs.environment_name }}
+    steps:
       - name: Set Environment
         id: set_env
         run: |
@@ -108,13 +90,11 @@ jobs:
           elif [ "${{ github.event_name }}" = "issue_comment" ]; then
             echo "environment_name=${{ needs.check-comment.outputs.base_ref }}" >> $GITHUB_OUTPUT
           fi
-  #########################################################################
-  # 3️⃣ Validate Deployment and Run Tests
-  #########################################################################
+
   validate-deployment:
-      runs-on: ubuntu-latest
-      needs: setup-environment
-      steps:
+    runs-on: ubuntu-latest
+    needs: setup-environment
+    steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
