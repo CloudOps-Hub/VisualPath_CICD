@@ -103,7 +103,12 @@ jobs:
 
   validate-deployment:
     runs-on: ubuntu-latest
-    needs: setup-environment
+    needs: [setup-environment, check-comment]
+    if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || needs.check-comment.outputs.should_run_tests == 'true')
+    environment: ${{ needs.setup-environment.outputs.environment_name }}
+    #container:
+      #image: docker.nexus.nee.com/salesforce/cli:latest-full
+      #options: --user root
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
