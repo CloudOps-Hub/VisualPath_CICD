@@ -1,5 +1,5 @@
 name: PR-Validate-Sandbox
-run-name: "PR Validation for Sandbox"
+run-name: "PR Validation - Sandbox"
 
 on:
   workflow_dispatch:
@@ -11,33 +11,30 @@ on:
         description: "Please enter head branch name."
         required: true
       sandbox:
-        description: "Select Sandbox to validate in"
+        description: "In which Sandbox do you want to validate?"
         required: true
         type: choice
         options:
           - test
           - qa
           - uat
-        default: test
-
+        default: NONE
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    branches: [main, qa, uat]
+    types: [opened, synchronize, edited, reopened, ready_for_review]
+    branches: [test, uat]
     paths:
       - "force-app/**"
-
   issue_comment:
-    types: [created, edited]
+    types: [created]
 
 env:
   HTTP_PROXY: "xx"
   HTTPS_PROXY: "xx"
   NO_PROXY: ""
+  TESTLEVEL: RunLocalTests
+  TESTCLASSES: all
 
 jobs:
-  #########################################################################
-  # 1️⃣ Check Comments - Detect Test Commands
-  #########################################################################
   check-comment:
     runs-on: ubuntu-latest
     if: github.event_name == 'issue_comment' && github.event.issue.pull_request
@@ -46,7 +43,6 @@ jobs:
       pr_number: ${{ steps.filter_comment.outputs.pr_number }}
       base_ref: ${{ steps.filter_comment.outputs.base_ref }}
       head_ref: ${{ steps.filter_comment.outputs.head_ref }}
-      test_classes: ${{ steps.filter_comment.outputs.test_classes }}
     steps:
       - name: Filter Comment for Test Commands
         id: filter_comment
@@ -87,16 +83,12 @@ jobs:
           echo "head_ref=$head_ref" >> $GITHUB_OUTPUT
           echo "✅ Base: $base_ref | Head: $head_ref"
 
-  #########################################################################
-  # 2️⃣ Setup Environment
-  #########################################################################
   setup-environment:
     runs-on: ubuntu-latest
-    needs: [check-comment]
+    needs: check-comment
     if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || needs.check-comment.outputs.should_run_tests == 'true')
     outputs:
       environment_name: ${{ steps.set_env.outputs.environment_name }}
-
     steps:
       - name: Set Environment
         id: set_env
@@ -109,10 +101,7 @@ jobs:
             echo "environment_name=${{ needs.check-comment.outputs.base_ref }}" >> $GITHUB_OUTPUT
           fi
 
-  #########################################################################
-  # 3️⃣ Validate Deployment and Run Tests
-  #########################################################################
-  validation-on-sandbox:
+  validate-deployment:
     runs-on: ubuntu-latest
     needs: [setup-environment, check-comment]
     if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || needs.check-comment.outputs.should_run_tests == 'true')
@@ -120,88 +109,71 @@ jobs:
     #container:
       #image: docker.nexus.nee.com/salesforce/cli:latest-full
       #options: --user root
-
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Configure Git
-        run: |
-          git config --system --add safe.directory "$GITHUB_WORKSPACE"
-          git config --local user.name "Salesforce DevOps"
-          git config --local user.email "salesforce-devops@users.noreply.github.com"
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-      - name: Extract Test Classes (parser.js)
-        env:
-          COMMENT_BODY: ${{ github.event.comment.body || '' }}
-          PR_BODY: ${{ github.event.pull_request.body || '' }}
-        run: |
-          if [ "${{ github.event_name }}" = "issue_comment" ]; then
-            echo "$COMMENT_BODY" > ./comment_body.txt
-            node ./parser.js
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "$PR_BODY" > ./pr_body.txt
-            node ./parser.js
-          else
-            echo "all" > ./testsToRun.txt
-          fi
-          TESTS=$(cat testsToRun.txt)
-          echo "APEX_TESTS=$TESTS" >> $GITHUB_ENV
-          echo "Selected tests: $TESTS"
+      - name: Install Salesforce CLI
+        run: npm install -g @salesforce/cli
 
       - name: Install sfdx-git-delta Plugin
+        run: echo "y" | sf plugins install sfdx-git-delta
+
+      # 🔹 Extract test classes from PR comment or body
+      - name: Extract Test Classes from Comment or PR Body
         run: |
-          echo y | sf plugins install sfdx-git-delta
-          sf plugins
+          node .github/scripts/parser.js
+          echo "Extracted tests:"
+          cat .github/scripts/testsToRun.txt
+        continue-on-error: false
 
-      - name: Authenticate to Sandbox Org
+      - name: Read Extracted Test Classes
+        id: read-tests
         run: |
-          echo "${{ secrets.SFDX_AUTH_URL }}" > ./SFDX_AUTH_URL.txt
-          sf org login sfdx-url -f ./SFDX_AUTH_URL.txt -a targetOrg
-
-      - name: Create Delta Package
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            base_branch="${{ inputs.base }}"
-            head_branch="${{ inputs.head }}"
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            base_branch="${{ github.event.pull_request.base.ref }}"
-            head_branch="${{ github.event.pull_request.head.ref }}"
-          elif [ "${{ github.event_name }}" = "issue_comment" ]; then
-            base_branch="${{ needs.check-comment.outputs.base_ref }}"
-            head_branch="${{ needs.check-comment.outputs.head_ref }}"
-          fi
-
-          echo "Base branch: $base_branch"
-          echo "Head branch: $head_branch"
-
-          mkdir changed-sources
-          sf agd source delta --to "origin/$head_branch" --from "origin/$base_branch" -o changed-sources/ --generate-delta -f
-          cd changed-sources
-          ls -R
-
-      - name: Validate Deployment
-        run: |
-          echo "Starting validation..."
-          if [ "${{ env.APEX_TESTS }}" = "all" ]; then
-            validation_output=$(sf project deploy validate --source-dir "changed-sources/force-app" --async --test-level RunLocalTests --json)
+          tests=$(cat .github/scripts/testsToRun.txt)
+          echo "TESTCLASSES=$tests" >> $GITHUB_ENV
+          if [ "$tests" = "all" ]; then
+            echo "TESTLEVEL=RunLocalTests" >> $GITHUB_ENV
           else
-            validation_output=$(sf project deploy validate --source-dir "changed-sources/force-app" --async --test-level RunSpecifiedTests --tests "${{ env.APEX_TESTS }}" --json)
+            echo "TESTLEVEL=RunSpecifiedTests" >> $GITHUB_ENV
           fi
 
-          echo "Validation Output: $validation_output"
-          job_id=$(echo $validation_output | jq -r '.result.id')
-          echo "job_id=$job_id" >> $GITHUB_ENV
-          echo $job_id > job_id.txt
+      - name: Create server.key from secret
+        run: |
+          mkdir -p assets
+          echo "${{ secrets.JWT_KEY }}" | base64 --decode > assets/server.key
 
-          sf project deploy resume --job-id $job_id
+      - name: Authenticate Salesforce Org
+        run: |
+          sf org login jwt \
+            --client-id ${{ secrets.CLIENT_ID }} \
+            --jwt-key-file assets/server.key \
+            --username ${{ secrets.SF_USERNAME_UAT }} \
+            --instance-url https://login.salesforce.com \
+            --alias HUH
 
-      - name: Upload Job ID Artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: job-id-artifact-${{ github.run_id }}
-          path: job_id.txt
-          retention-days: 5
+      - name: Generate the package.xml for delta files
+        id: generate-delta-files
+        run: |
+          mkdir delta
+          sf sgd source delta --to "HEAD" --from "HEAD~1" \
+            --output "./delta" --ignore-whitespace -d -i .sgdignore
+          echo "--- package.xml generated with added and modified metadata ---"
+          cat delta/package/package.xml || echo "No package.xml generated"
+
+      - name: Validate components to Salesforce
+        id: validate-pull-request-components
+        run: |
+          sf project deploy validate \
+            --manifest delta/package/package.xml \
+            --test-level ${{ env.TESTLEVEL }} \
+            --tests ${{ env.TESTCLASSES }} \
+            --target-org HUH \
+            --coverage-formatters clover
