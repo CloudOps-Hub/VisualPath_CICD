@@ -1,6 +1,7 @@
 //TEST
 //Updated Meta.xml version
 //MergeConflict Resolution
+//Test PR
 @isTest
 public class EmpClassTest {
     public static testmethod void main(){
@@ -9,6 +10,7 @@ public class EmpClassTest {
         obj.grossSalary();
         obj.netSalary();
         obj.getValues(); 
+//Test
     }
 
 }

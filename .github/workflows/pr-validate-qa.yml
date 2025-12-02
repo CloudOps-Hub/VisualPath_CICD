@@ -1,12 +1,16 @@
-name: PR Validate → QA
+name: Salesforce PR Validation - QA
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches:
-      - develop
+      - qa
     paths:
       - 'force-app/**'
+
+env:
+  TESTLEVEL: RunSpecifiedTests
+  TESTCLASSES: FirstClassTest EmpClassTest
 
 jobs:
   call-deploy:
